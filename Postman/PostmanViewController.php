@@ -35,11 +35,34 @@ if ( ! class_exists( 'PostmanViewController' ) ) {
 			PostmanUtils::registerAdminMenu( $this, 'addPurgeDataSubmenu' );
 
 			// initialize the scripts, stylesheets and form fields
-			add_action( 'admin_init', array(
-					$this,
-					'registerStylesAndScripts',
-			), 0 );
+			add_action( 'admin_init', array( $this, 'registerStylesAndScripts' ), 0 );
+			add_action( 'admin_init', array( $this, 'do_activation_redirect' ) );
+
 		}
+
+		function do_activation_redirect() {
+
+			// Bail if no activation redirect
+		    if ( ! get_transient( '_post_activation_redirect' ) ) {
+				return;
+			}
+
+			// Delete the redirect transient
+			// delete_transient( '_post_activation_redirect' );
+			// Bail if activating from network, or bulk
+			if ( is_network_admin() || isset( $_GET['activate-multi'] ) ) {
+				return;
+			}
+
+			// Bail if the current user cannot see the about page
+			if ( ! current_user_can( 'manage_options' ) ) {
+				return;
+			}
+
+			// Redirect to bbPress about page
+			wp_safe_redirect( add_query_arg( array( 'page' => 'post-about' ), admin_url( 'index.php' ) ) );
+		}
+
 		public static function getPageUrl( $slug ) {
 			return PostmanUtils::getPageUrl( $slug );
 		}
@@ -49,14 +72,14 @@ if ( ! class_exists( 'PostmanViewController' ) ) {
 		 */
 		public function generateDefaultContent() {
 			// This page will be under "Settings"
-			$pageTitle = sprintf( __( '%s Setup', Postman::TEXT_DOMAIN ), __( 'Postman SMTP', Postman::TEXT_DOMAIN ) );
-			$pluginName = __( 'Postman SMTP', Postman::TEXT_DOMAIN );
+			$pageTitle = sprintf( __( '%s Setup', Postman::TEXT_DOMAIN ), __( 'Post SMTP', Postman::TEXT_DOMAIN ) );
+			$pluginName = __( 'Post SMTP', Postman::TEXT_DOMAIN );
 			$uniqueId = self::POSTMAN_MENU_SLUG;
 			$pageOptions = array(
 					$this,
 					'outputDefaultContent',
 			);
-			$mainPostmanSettingsPage = add_options_page( $pageTitle, $pluginName, Postman::MANAGE_POSTMAN_CAPABILITY_NAME, $uniqueId, $pageOptions );
+			$mainPostmanSettingsPage = add_menu_page( $pageTitle, $pluginName, Postman::MANAGE_POSTMAN_CAPABILITY_NAME, $uniqueId, $pageOptions );
 			// When the plugin options page is loaded, also load the stylesheet
 			add_action( 'admin_print_styles-' . $mainPostmanSettingsPage, array(
 					$this,
@@ -72,7 +95,7 @@ if ( ! class_exists( 'PostmanViewController' ) ) {
 		 * Register the Email Test screen
 		 */
 		public function addPurgeDataSubmenu() {
-			$page = add_submenu_page( null, sprintf( __( '%s Setup', Postman::TEXT_DOMAIN ), __( 'Postman SMTP', Postman::TEXT_DOMAIN ) ), __( 'Postman SMTP', Postman::TEXT_DOMAIN ), Postman::MANAGE_POSTMAN_CAPABILITY_NAME, PostmanAdminController::MANAGE_OPTIONS_PAGE_SLUG, array(
+			$page = add_submenu_page( null, sprintf( __( '%s Setup', Postman::TEXT_DOMAIN ), __( 'Post SMTP', Postman::TEXT_DOMAIN ) ), __( 'Post SMTP', Postman::TEXT_DOMAIN ), Postman::MANAGE_POSTMAN_CAPABILITY_NAME, PostmanAdminController::MANAGE_OPTIONS_PAGE_SLUG, array(
 					$this,
 					'outputPurgeDataContent',
 			) );
@@ -97,7 +120,9 @@ if ( ! class_exists( 'PostmanViewController' ) ) {
 			wp_register_style( 'jquery_steps_style', plugins_url( 'style/jquery-steps/jquery.steps.css', $this->rootPluginFilenameAndPath ), PostmanViewController::POSTMAN_STYLE, '1.1.0' );
 
 			wp_register_script( PostmanViewController::POSTMAN_SCRIPT, plugins_url( 'script/postman.js', $this->rootPluginFilenameAndPath ), array(
-					PostmanViewController::JQUERY_SCRIPT
+					PostmanViewController::JQUERY_SCRIPT,
+				'jquery-ui-core',
+				'jquery-ui-datepicker',
 			), $pluginData ['version'] );
 			wp_register_script( 'sprintf', plugins_url( 'script/sprintf/sprintf.min.js', $this->rootPluginFilenameAndPath ), null, '1.0.2' );
 			wp_register_script( 'jquery_steps_script', plugins_url( 'script/jquery-steps/jquery.steps.min.js', $this->rootPluginFilenameAndPath ), array(
@@ -159,7 +184,7 @@ if ( ! class_exists( 'PostmanViewController' ) ) {
 				if ( PostmanState::getInstance()->isTimeToReviewPostman() && ! PostmanOptions::getInstance()->isNew() ) {
 					print '</br><hr width="70%"></br>';
 					/* translators: where %s is the URL to the WordPress.org review and ratings page */
-					printf( '%s</span></p>', sprintf( __( 'Please consider <a href="%s">leaving a review</a> to help spread the word! :D', Postman::TEXT_DOMAIN ), 'https://wordpress.org/support/view/plugin-reviews/postman-smtp?filter=5' ) );
+					printf( '%s</span></p>', sprintf( __( 'Please consider <a href="%s">leaving a review</a> to help spread the word! :D', Postman::TEXT_DOMAIN ), 'https://wordpress.org/support/view/plugin-reviews/post-smtp?filter=5' ) );
 				}
 				printf( '<p><span>%s :-)</span></p>', sprintf( __( 'Postman needs translators! Please take a moment to <a href="%s">translate a few sentences on-line</a>', Postman::TEXT_DOMAIN ), 'https://translate.wordpress.org/projects/wp-plugins/post-smtp/stable' ) );
 			}
@@ -180,7 +205,7 @@ if ( ! class_exists( 'PostmanViewController' ) ) {
 		 * @param string  $slug
 		 */
 		public static function outputChildPageHeader( $title, $slug = '' ) {
-			printf( '<h2>%s</h2>', sprintf( __( '%s Setup', Postman::TEXT_DOMAIN ), __( 'Postman SMTP', Postman::TEXT_DOMAIN ) ) );
+			printf( '<h2>%s</h2>', sprintf( __( '%s Setup', Postman::TEXT_DOMAIN ), __( 'Post SMTP', Postman::TEXT_DOMAIN ) ) );
 			printf( '<div id="postman-main-menu" class="welcome-panel %s">', $slug );
 			print '<div class="welcome-panel-content">';
 			print '<div class="welcome-panel-column-container">';
@@ -251,15 +276,14 @@ if ( ! class_exists( 'PostmanViewController' ) ) {
 		/**
 		 */
 		private function displayTopNavigation() {
-			screen_icon();
-			printf( '<h2>%s</h2>', sprintf( __( '%s Setup', Postman::TEXT_DOMAIN ), __( 'Postman SMTP', Postman::TEXT_DOMAIN ) ) );
+			printf( '<h2>%s</h2>', sprintf( __( '%s Setup', Postman::TEXT_DOMAIN ), __( 'Post SMTP', Postman::TEXT_DOMAIN ) ) );
 			print '<div id="postman-main-menu" class="welcome-panel">';
 			print '<div class="welcome-panel-content">';
 			print '<div class="welcome-panel-column-container">';
 			print '<div class="welcome-panel-column">';
 			printf( '<h4>%s</h4>', __( 'Configuration', Postman::TEXT_DOMAIN ) );
 			printf( '<a class="button button-primary button-hero" href="%s">%s</a>', $this->getPageUrl( PostmanConfigurationController::CONFIGURATION_WIZARD_SLUG ), __( 'Start the Wizard', Postman::TEXT_DOMAIN ) );
-			printf( '<p class="">or <a href="%s" class="configure_manually">%s</a></p>', $this->getPageUrl( PostmanConfigurationController::CONFIGURATION_SLUG ), __( 'Show All Settings', Postman::TEXT_DOMAIN ) );
+			printf( '<p class="">%s <a href="%s" class="configure_manually">%s</a></p>', __( 'or', Postman::TEXT_DOMAIN ), $this->getPageUrl( PostmanConfigurationController::CONFIGURATION_SLUG ), __( 'Show All Settings', Postman::TEXT_DOMAIN ) );
 			print '</div>';
 			print '<div class="welcome-panel-column">';
 			printf( '<h4>%s</h4>', _x( 'Actions', 'Main Menu', Postman::TEXT_DOMAIN ) );
@@ -292,7 +316,8 @@ if ( ! class_exists( 'PostmanViewController' ) ) {
 			print '<ul>';
 			printf( '<li><a href="%s" class="welcome-icon run-port-test">%s</a></li>', $this->getPageUrl( PostmanConnectivityTestController::PORT_TEST_SLUG ), __( 'Connectivity Test', Postman::TEXT_DOMAIN ) );
 			printf( '<li><a href="%s" class="welcome-icon run-port-test">%s</a></li>', $this->getPageUrl( PostmanDiagnosticTestController::DIAGNOSTICS_SLUG ), __( 'Diagnostic Test', Postman::TEXT_DOMAIN ) );
-			printf( '<li><a href="https://wordpress.org/support/plugin/postman-smtp" class="welcome-icon postman_support">%s</a></li>', __( 'Online Support', Postman::TEXT_DOMAIN ) );
+			printf( '<li><a href="https://postmansmtp.com/forums/" class="welcome-icon postman_support">%s</a></li>', __( 'Online Support', Postman::TEXT_DOMAIN ) );
+			printf( '<li><img class="align-middle" src="' . plugins_url( 'style/images/new.gif', dirname( __DIR__ ) . '/postman-smtp.php' ) . '"><a target="blank" class="align-middle" href="https://postmansmtp.com/category/guides/" class="welcome-icon postman_guides">%s</a></li>', __( 'Guides', Postman::TEXT_DOMAIN ) );
 			print '</ul></div></div></div></div>';
 		}
 	}
